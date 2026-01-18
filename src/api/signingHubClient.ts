@@ -1,6 +1,10 @@
 // src/api/signingHubClient.ts
 import axios from "axios";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+const api = axios.create({
+    baseURL: API_BASE_URL,
+})
 export type UploadResponse = {
     packageId: string;
     documentId: string;
@@ -12,7 +16,7 @@ export async function uploadFile(file: File) {
     // 🔑 FIELD NAME MUST BE "file"
     formData.append("file", file, file.name);
 
-    const res = await axios.post("/api/upload", formData);
+    const res = await api.post("/api/upload", formData);
 
     console.log("Upload API response:", res.data);
 
@@ -27,7 +31,7 @@ export async function signDocument(
     documentId: string,
     signerName: string
 ) {
-    const res = await axios.post("http://localhost:3003/api/sign", {
+    const res = await api.post("/api/sign", {
         packageId,
         documentId,
         signerName,
@@ -36,15 +40,13 @@ export async function signDocument(
     return res.data;
 }
 
+
 export async function downloadSignedPackage(packageId: number) {
     console.log("Downloading signed package:", packageId);
 
-    const res = await axios.get(
-        `/api/download/${packageId}`,
-        {
-            responseType: "arraybuffer",
-        }
-    );
+    const res = await api.get(`/api/download/${packageId}`, {
+        responseType: "arraybuffer",
+    });
 
     console.log("Download response type:", res.data.constructor.name);
 
