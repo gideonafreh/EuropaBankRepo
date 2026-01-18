@@ -3,7 +3,6 @@ FROM node:22-slim
 RUN apt-get update && \
     apt-get install -y \
       libreoffice-core-nogui \
-      libreoffice-writer \
       libreoffice-common \
       fontconfig \
       fonts-dejavu \
@@ -16,6 +15,7 @@ RUN apt-get update && \
       libdbus-glib-1-2 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
 
 WORKDIR /app
 
