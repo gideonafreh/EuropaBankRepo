@@ -1,8 +1,10 @@
 FROM node:22-slim
 
+# LibreOffice deps (keep what you already have)
 RUN apt-get update && \
     apt-get install -y \
       libreoffice-core-nogui \
+      libreoffice-writer \
       libreoffice-common \
       fontconfig \
       fonts-dejavu \
@@ -16,15 +18,14 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-
+# 👇 THIS IS THE KEY CHANGE
 WORKDIR /app
 
-COPY backend/package*.json ./backend/
-WORKDIR /app/backend
+COPY backend/package*.json ./
 RUN npm install
 
-COPY backend ./backend
-RUN ls -la && ls -la src && cat tsconfig.json
+COPY backend ./
+
 RUN npm run build
 
 EXPOSE 3003
