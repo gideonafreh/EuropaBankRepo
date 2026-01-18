@@ -19,42 +19,46 @@ export function Home() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploaded, setUploaded] = useState(false);
     const [loading, setLoading] = useState(false);
-
     async function handleDownload() {
-        if (!packageId) return;
+        if (!packageId || !name.trim()) return;
+
 
         console.log("Downloading signed package:", packageId);
+
         try {
             setLoading(true);
-            await downloadSignedPackage(Number(packageId));
+
+            // ⬇️ SINGLE request
+            const buffer = await downloadSignedPackage(Number(packageId));
+
+            console.log("=== ARRAYBUFFER RECEIVED ===");
+            console.log("Byte length:", buffer.byteLength);
+
+            // Create PDF blob
+            const blob = new Blob([buffer], {
+                type: "application/pdf",
+            });
+
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+
+            // ✅ signer name added here
+            a.download = `${name}-signed-package-${packageId}.pdf`;
+
+            document.body.appendChild(a);
+            a.click();
+
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            console.log("✅ PDF download triggered");
         } finally {
             setLoading(false);
         }
-        // ⬇️ THIS IS AN ARRAYBUFFER
-        const buffer = await downloadSignedPackage(Number(packageId));
-
-        console.log("=== ARRAYBUFFER RECEIVED ===");
-        console.log("Byte length:", buffer.byteLength);
-
-        // Create PDF blob
-        const blob = new Blob(
-            [buffer],
-            { type: "application/pdf" }
-        );
-        console.log(new Uint8Array(buffer).slice(0, 8));
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `signed-package-${packageId}.pdf`;
-        a.click();
-
-        URL.revokeObjectURL(url);
-
-        console.log("✅ PDF download triggered");
-
-
     }
+
 
 
 
