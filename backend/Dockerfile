@@ -4,8 +4,6 @@ FROM node:22-slim
 RUN apt-get update && \
     apt-get install -y \
       libreoffice-core-nogui \
-      libreoffice-writer \
-      libreoffice-common \
       fontconfig \
       fonts-dejavu \
       fonts-liberation \
