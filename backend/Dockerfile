@@ -24,6 +24,7 @@ WORKDIR /app/backend
 RUN npm install
 
 COPY backend ./backend
+RUN ls -la && ls -la src && cat tsconfig.json
 RUN npm run build
 
 EXPOSE 3003
