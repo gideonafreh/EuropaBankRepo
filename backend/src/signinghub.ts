@@ -64,7 +64,8 @@ async function convertDocxToPdf(
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "lo-"));
     const inputPath = path.join(tmpDir, file.originalname);
     const outputPath = inputPath.replace(/\.(docx?|DOCX?)$/, ".pdf");
-
+    const loProfileDir = path.join(tmpDir, "profile");
+    await fs.mkdir(loProfileDir, { recursive: true });
     await fs.writeFile(inputPath, file.buffer);
     console.log("DOCX written to temp:", inputPath);
 
@@ -82,6 +83,7 @@ async function convertDocxToPdf(
                 "--nodefault",
                 "--nolockcheck",
                 "--nocrashreport",
+                `-env:UserInstallation=file://${loProfileDir}`,
                 "--convert-to",
                 "pdf",
                 "--outdir",
@@ -96,7 +98,6 @@ async function convertDocxToPdf(
                 },
             }
         );
-
         let stderr = "";
 
         proc.stderr.on("data", (d) => {
