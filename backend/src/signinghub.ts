@@ -73,7 +73,7 @@ async function convertDocxToPdf(
 
     await new Promise<void>((resolve, reject) => {
         const proc = spawn(
-            "soffice",
+            sofficePath,
             [
                 "--headless",
                 "--nologo",
@@ -504,24 +504,27 @@ async function downloadSignedPackageBinary(packageId: number): Promise<Buffer> {
 export async function downloadPackageController(req: Request, res: Response) {
     try {
         const packageId = Number(req.params.packageId);
-        console.log("Download request for package:", packageId);
+        const signerName = String(req.query.signerName || "signer");
+
+        console.log("Download request:", { packageId, signerName });
 
         const pdfBuffer = await downloadSignedPackageBinary(packageId);
+
+        const safeSigner = signerName.replace(/[^a-z0-9_-]/gi, "_");
 
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader(
             "Content-Disposition",
-            `attachment; filename="signed-package-${packageId}.pdf"`
+            `attachment; filename="${safeSigner}-signed-package-${packageId}.pdf"`
         );
         res.setHeader("Content-Length", pdfBuffer.length);
 
-        res.end(pdfBuffer); // ✅ RAW BYTES ONLY
+        res.end(pdfBuffer);
     } catch (err) {
         console.error("DOWNLOAD ERROR:", err);
         res.status(500).json({ error: "Download failed" });
     }
 }
-
 
 
 
