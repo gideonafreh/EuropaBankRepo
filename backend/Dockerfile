@@ -1,28 +1,38 @@
 FROM node:22-slim
 
-# Install LibreOffice
+# Install LibreOffice + required runtime deps
 RUN apt-get update && \
-    apt-get install -y libreoffice libreoffice-writer && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y \
+      libreoffice \
+      libreoffice-writer \
+      fontconfig \
+      fonts-dejavu \
+      fonts-liberation \
+      fonts-freefont-ttf \
+      libxinerama1 \
+      libxrandr2 \
+      libxrender1 \
+      libxt6 \
+      libgtk-3-0 \
+      libdbus-glib-1-2 \
+      default-jre \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
 # Copy backend package files
 COPY backend/package*.json ./backend/
 
-# Install dependencies (including dev, needed for tsc)
+# Install backend deps (incl dev for tsc)
 RUN cd backend && npm install --include=dev
 
 # Copy backend source
 COPY backend ./backend
 
-# Build TypeScript
+# Build backend
 RUN cd backend && npm run build
 
-# Expose port Render will assign
 EXPOSE 3003
 
-# Start backend
 CMD ["node", "backend/dist/index.js"]
