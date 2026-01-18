@@ -68,29 +68,61 @@ async function convertDocxToPdf(
     await fs.writeFile(inputPath, file.buffer);
     console.log("DOCX written to temp:", inputPath);
 
-    const sofficeCmd = "libreoffice";
+    const sofficePath = "/usr/lib/libreoffice/program/soffice.bin";
 
     await new Promise<void>((resolve, reject) => {
-        const process = spawn(sofficeCmd, [
-            "--headless",
-            "--nologo",
-            "--nofirststartwizard",
-            "--convert-to",
-            "pdf",
-            "--outdir",
-            tmpDir,
-            inputPath,
-        ]);
+        const proc = spawn(
+            sofficePath,
+            [
+                "--headless",
+                "--nologo",
+                "--nofirststartwizard",
+                "--norestore",
+                "--invisible",
+                "--nodefault",
+                "--nolockcheck",
+                "--nocrashreport",
+                "--convert-to",
+                "pdf",
+                "--outdir",
+                tmpDir,
+                inputPath,
+            ],
+            {
+                env: {
+                    ...process.env,
+                    HOME: "/tmp",
+                    SAL_USE_VCLPLUGIN: "gen",
+                },
+            }
+        );
 
-        process.on("error", (err) => {
-            reject(err);
+        let stderr = "";
+
+        proc.stderr.on("data", (d) => {
+            stderr += d.toString();
         });
 
-        process.on("exit", (code) => {
-            if (code === 0) {
+        proc.on("error", reject);
+
+        proc.on("close", async (code) => {
+            if (code !== 0) {
+                return reject(
+                    new Error(
+                        `LibreOffice failed with code ${code}\n${stderr}`
+                    )
+                );
+            }
+
+            try {
+                await fs.access(outputPath);
                 resolve();
-            } else {
-                reject(new Error(`LibreOffice exited with code ${code}`));
+            } catch {
+                reject(
+                    new Error(
+                        "LibreOffice exited successfully but PDF not found"
+                    )
+                );
             }
         });
     });
@@ -98,7 +130,6 @@ async function convertDocxToPdf(
     console.log("LibreOffice conversion finished");
 
     const pdfBuffer = await fs.readFile(outputPath);
-    console.log("PDF read from temp:", outputPath);
 
     return {
         buffer: pdfBuffer,
@@ -106,6 +137,7 @@ async function convertDocxToPdf(
         mimetype: "application/pdf",
     };
 }
+
 /* =========================================================
    PACKAGE CREATION
 ========================================================= */
