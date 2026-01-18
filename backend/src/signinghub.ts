@@ -1,13 +1,11 @@
 import fetch from "node-fetch";
 import axios from "axios";
 import { Request, Response } from "express";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import {spawn} from "node:child_process";
 
-const execFileAsync = promisify(execFile);
 
 /* =========================================================
    ENV
@@ -51,6 +49,9 @@ async function authenticate(): Promise<string> {
 /* =========================================================
    DOCX → PDF CONVERTER (WINDOWS SAFE)
 ========================================================= */
+/* =========================================================
+   DOCX → PDF CONVERTER (LINUX / DOCKER SAFE)
+========================================================= */
 async function convertDocxToPdf(
     file: Express.Multer.File
 ): Promise<{
@@ -67,9 +68,10 @@ async function convertDocxToPdf(
     await fs.writeFile(inputPath, file.buffer);
     console.log("DOCX written to temp:", inputPath);
 
-    await execFileAsync(
-        "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
-        [
+    const sofficeCmd = "libreoffice";
+
+    await new Promise<void>((resolve, reject) => {
+        const process = spawn(sofficeCmd, [
             "--headless",
             "--nologo",
             "--nofirststartwizard",
@@ -78,13 +80,24 @@ async function convertDocxToPdf(
             "--outdir",
             tmpDir,
             inputPath,
-        ]
-    );
+        ]);
+
+        process.on("error", (err) => {
+            reject(err);
+        });
+
+        process.on("exit", (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`LibreOffice exited with code ${code}`));
+            }
+        });
+    });
 
     console.log("LibreOffice conversion finished");
 
     const pdfBuffer = await fs.readFile(outputPath);
-
     console.log("PDF read from temp:", outputPath);
 
     return {
@@ -93,7 +106,6 @@ async function convertDocxToPdf(
         mimetype: "application/pdf",
     };
 }
-
 /* =========================================================
    PACKAGE CREATION
 ========================================================= */
