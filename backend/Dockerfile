@@ -1,6 +1,5 @@
 FROM node:22-slim
 
-# Install LibreOffice (NO GUI) + runtime deps
 RUN apt-get update && \
     apt-get install -y \
       libreoffice-core \
@@ -10,7 +9,6 @@ RUN apt-get update && \
       fontconfig \
       fonts-dejavu \
       fonts-liberation \
-      fonts-freefont-ttf \
       libxinerama1 \
       libxrandr2 \
       libxrender1 \
