@@ -2,10 +2,9 @@ FROM node:22-slim
 
 RUN apt-get update && \
     apt-get install -y \
-      libreoffice-core \
+      libreoffice-core-nogui \
       libreoffice-writer \
       libreoffice-common \
-      libreoffice-core-nogui \
       fontconfig \
       fonts-dejavu \
       fonts-liberation \
@@ -18,16 +17,14 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Important: writable HOME for LibreOffice
-ENV HOME=/tmp
-
 WORKDIR /app
 
 COPY backend/package*.json ./backend/
-RUN cd backend && npm install --include=dev
+WORKDIR /app/backend
+RUN npm install
 
 COPY backend ./backend
-RUN cd backend && npm run build
+RUN npm run build
 
 EXPOSE 3003
-CMD ["node", "backend/dist/index.js"]
+CMD ["npm", "start"]
