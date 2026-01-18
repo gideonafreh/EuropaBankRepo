@@ -1,0 +1,22 @@
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.85);
+    z-index: 9999;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-overlay img {
+    width: 140px;
+    height: auto;
+}
+
+.loading-overlay p {
+    margin-top: 16px;
+    font-weight: 600;
+    color: #444;
+}
