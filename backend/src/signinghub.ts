@@ -69,11 +69,11 @@ async function convertDocxToPdf(
     await fs.writeFile(inputPath, file.buffer);
     console.log("DOCX written to temp:", inputPath);
 
-    const sofficePath = "/usr/lib/libreoffice/program/soffice.bin";
+    const sofficePath = "soffice";
 
     await new Promise<void>((resolve, reject) => {
         const proc = spawn(
-            sofficePath,
+            "soffice",
             [
                 "--headless",
                 "--nologo",
@@ -83,6 +83,7 @@ async function convertDocxToPdf(
                 "--nodefault",
                 "--nolockcheck",
                 "--nocrashreport",
+                "--safe-mode",
                 `-env:UserInstallation=file://${loProfileDir}`,
                 "--convert-to",
                 "pdf",
@@ -93,8 +94,11 @@ async function convertDocxToPdf(
             {
                 env: {
                     ...process.env,
-                    HOME: "/tmp",
+                    HOME: loProfileDir,
+                    LANG: "en_US.UTF-8",
+                    LC_ALL: "en_US.UTF-8",
                     SAL_USE_VCLPLUGIN: "gen",
+                    DBUS_SESSION_BUS_ADDRESS: "disabled",
                 },
             }
         );
