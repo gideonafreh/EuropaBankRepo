@@ -1,11 +1,6 @@
 import fetch from "node-fetch";
 import axios from "axios";
 import { Request, Response } from "express";
-import fs from "fs/promises";
-import path from "path";
-import os from "os";
-import {spawn} from "node:child_process";
-
 
 /* =========================================================
    ENV
@@ -15,13 +10,12 @@ const CLIENT_ID = process.env.SIGNINGHUB_CLIENT_ID!;
 const CLIENT_SECRET = process.env.SIGNINGHUB_CLIENT_SECRET!;
 const USERNAME = process.env.SIGNINGHUB_USERNAME!;
 const PASSWORD = process.env.SIGNINGHUB_PASSWORD!;
-const SIGNATURE_BASE64 = process.env.SIGNATURE_BASE64!;
 
 /* =========================================================
    AUTH
 ========================================================= */
 async function authenticate(): Promise<string> {
-    console.log("Authenticating with SigningHub...");
+    console.log("🔐 Authenticating with SigningHub...");
 
     const form = new URLSearchParams();
     form.append("grant_type", "password");
@@ -37,124 +31,27 @@ async function authenticate(): Promise<string> {
         },
     });
 
-    const token = res.data?.access_token;
-    if (!token) {
-        throw new Error("No access token returned from SigningHub");
+    if (!res.data?.access_token) {
+        console.error("❌ Authentication failed:", res.data);
+        throw new Error("Authentication failed");
     }
 
-    console.log("Authentication successful");
-    return token;
+    console.log("✅ Authentication OK");
+    return res.data.access_token;
 }
 
 /* =========================================================
-   DOCX → PDF CONVERTER (WINDOWS SAFE)
-========================================================= */
-/* =========================================================
-   DOCX → PDF CONVERTER (LINUX / DOCKER SAFE)
-========================================================= */
-async function convertDocxToPdf(
-    file: Express.Multer.File
-): Promise<{
-    buffer: Buffer;
-    filename: string;
-    mimetype: string;
-}> {
-    console.log("Starting DOCX → PDF conversion");
-
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "lo-"));
-    const inputPath = path.join(tmpDir, file.originalname);
-    const outputPath = inputPath.replace(/\.(docx?|DOCX?)$/, ".pdf");
-    const loProfileDir = path.join(tmpDir, "profile");
-    await fs.mkdir(loProfileDir, { recursive: true });
-    await fs.writeFile(inputPath, file.buffer);
-    console.log("DOCX written to temp:", inputPath);
-
-    const sofficePath = "soffice";
-
-    await new Promise<void>((resolve, reject) => {
-        const proc = spawn(
-            sofficePath,
-            [
-                "--headless",
-                "--nologo",
-                "--nofirststartwizard",
-                "--norestore",
-                "--invisible",
-                "--nodefault",
-                "--nolockcheck",
-                "--nocrashreport",
-                "--safe-mode",
-                `-env:UserInstallation=file://${loProfileDir}`,
-                "--convert-to",
-                "pdf",
-                "--outdir",
-                tmpDir,
-                inputPath,
-            ],
-            {
-                env: {
-                    ...process.env,
-                    HOME: loProfileDir,
-                    LANG: "en_US.UTF-8",
-                    LC_ALL: "en_US.UTF-8",
-                    SAL_USE_VCLPLUGIN: "gen",
-                    DBUS_SESSION_BUS_ADDRESS: "disabled",
-                },
-            }
-        );
-        let stderr = "";
-
-        proc.stderr.on("data", (d) => {
-            stderr += d.toString();
-        });
-
-        proc.on("error", reject);
-
-        proc.on("close", async (code) => {
-            if (code !== 0) {
-                return reject(
-                    new Error(
-                        `LibreOffice failed with code ${code}\n${stderr}`
-                    )
-                );
-            }
-
-            try {
-                await fs.access(outputPath);
-                resolve();
-            } catch {
-                reject(
-                    new Error(
-                        "LibreOffice exited successfully but PDF not found"
-                    )
-                );
-            }
-        });
-    });
-
-    console.log("LibreOffice conversion finished");
-
-    const pdfBuffer = await fs.readFile(outputPath);
-
-    return {
-        buffer: pdfBuffer,
-        filename: file.originalname.replace(/\.(docx?|DOCX?)$/, ".pdf"),
-        mimetype: "application/pdf",
-    };
-}
-
-/* =========================================================
-   PACKAGE CREATION
+   CREATE PACKAGE
 ========================================================= */
 async function createPackage(): Promise<number> {
-    console.log("Creating SigningHub package...");
+    console.log("📦 Creating package...");
 
     const token = await authenticate();
 
     const res = await axios.post(
         `${BASE_URL}/v4/packages`,
         {
-            package_name: "Tight Integration Package",
+            package_name: "Quick Integration Package",
             workflow_mode: "ME_AND_OTHERS",
         },
         {
@@ -165,320 +62,169 @@ async function createPackage(): Promise<number> {
         }
     );
 
-    const packageId = res.data.package_id;
-    console.log("Package created:", packageId);
-
-    return packageId;
+    console.log("📦 Package created:", res.data);
+    return res.data.package_id;
 }
 
 /* =========================================================
-   DOCUMENT UPLOAD (BINARY – POSTMAN STYLE)
+   UPLOAD DOCUMENT
 ========================================================= */
 async function uploadDocumentToPackage(
     packageId: number,
     file: Express.Multer.File
 ): Promise<number> {
-
-    console.log("=== SIGNINGHUB UPLOAD START ===");
-
-    console.log("Upload input:", {
-        packageId,
-        filename: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
-    });
+    console.log(`📄 Uploading document to package ${packageId}`);
 
     const token = await authenticate();
 
-    const url = `${BASE_URL}/v4/packages/${packageId}/documents`;
-
-    const headers = {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/octet-stream",
-        "x-file-name": file.originalname, // 🔥 REQUIRED
-        "x-source": "API",
-        "Content-Length": file.size.toString(),
-    };
-
-    console.log("Outgoing headers:");
-    Object.entries(headers).forEach(([k, v]) =>
-        console.log(`  ${k}: ${v}`)
+    const res = await fetch(
+        `${BASE_URL}/v4/packages/${packageId}/documents`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/octet-stream",
+                "x-file-name": file.originalname,
+                "x-source": "API",
+                "Content-Length": file.size.toString(),
+            },
+            body: file.buffer,
+        }
     );
 
-    console.log("POST", url);
-    console.log("Sending raw binary body");
-
-    const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: file.buffer,
-    });
-
-    console.log("HTTP response:", {
-        status: res.status,
-        statusText: res.statusText,
-    });
-
     const text = await res.text();
-    console.log("Raw response body:", text);
+    console.log("📄 Upload response:", text);
 
     if (!res.ok) {
-        throw new Error(`SigningHub error ${res.status}: ${text}`);
+        throw new Error(`Document upload failed: ${text}`);
     }
 
     const json = JSON.parse(text);
-
-    console.log("Upload response JSON:", json);
-
-// 🔥 SigningHub returns `documentid` (lowercase, no underscore)
-    const documentId = json.documentid;
-
-    if (!documentId) {
-        throw new Error(
-            `SigningHub did not return documentid. Response: ${text}`
-        );
-    }
-
-    console.log("Resolved documentId:", documentId);
-
-    return documentId;
-
+    return json.documentid;
 }
 
 /* =========================================================
-   CONTROLLER
+   START WORKFLOW
 ========================================================= */
-export async function uploadDocumentController(
-    req: Request,
-    res: Response
-) {
+async function startWorkflow(packageId: number) {
+    console.log(`▶️ Starting workflow for package ${packageId}`);
+
+    const token = await authenticate();
+
+    const res = await axios.post(
+        `${BASE_URL}/v4/packages/${packageId}/workflow`,
+        {},
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+            },
+        }
+    );
+
+    console.log("▶️ Workflow started:", res.data);
+}
+
+/* =========================================================
+   CREATE IFRAME LINK (CORRECT API)
+========================================================= */
+async function createIframeLink(packageId: number): Promise<string> {
+    console.log("🖥️ Creating SigningHub iframe link...");
+
+    const token = await authenticate();
+
+    const payload = {
+        package_id: packageId,
+        language: "en-US",
+        response_type: "PLAIN",
+        collapse_panels: true,
+    };
+
+    console.log("🖥️ iframe payload:", payload);
+
+    const res = await axios.post(
+        `${BASE_URL}/v4/links/integration`,
+        payload,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+            },
+        }
+    );
+
+    console.log("🖥️ iframe response:", res.data);
+
+    // 🔥 FIX: response is a STRING, not { url: ... }
+    if (typeof res.data !== "string") {
+        throw new Error("SigningHub did not return iframe URL string");
+    }
+
+    return res.data;
+}
+
+
+/* =========================================================
+   UPLOAD CONTROLLER
+========================================================= */
+export async function uploadDocumentController(req: Request, res: Response) {
     try {
-        console.log("=== CONTROLLER START ===");
+        console.log("⬆️ Upload controller started");
 
         if (!req.file) {
-            console.error("No file received from frontend");
             return res.status(400).json({ error: "No file uploaded" });
         }
 
+        // 1️⃣ Create package
         const packageId = await createPackage();
 
-        console.log("Preparing document for upload");
+        // 2️⃣ Upload document ONCE and get documentId
+        const documentId = await uploadDocumentToPackage(packageId, req.file);
 
-        let fileToUpload: Express.Multer.File = req.file;
+        // 3️⃣ Create required signature field
+        await createSignatureField(packageId, documentId);
 
-        if (
-            req.file.mimetype ===
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ) {
-            console.log("DOCX detected → converting to PDF");
-
-            const converted = await convertDocxToPdf(req.file);
-
-            fileToUpload = {
-                ...req.file,
-                buffer: converted.buffer,
-                originalname: converted.filename,
-                mimetype: converted.mimetype,
-                size: converted.buffer.length,
-            } as Express.Multer.File;
-
-            console.log("Conversion completed:", {
-                filename: fileToUpload.originalname,
-                size: fileToUpload.size,
-            });
-        } else {
-            console.log("No conversion needed");
-        }
-
-        const documentId = await uploadDocumentToPackage(
-            packageId,
-            fileToUpload
-        );
-
-
-        console.log("Controller finished successfully");
-
-        console.log("UPLOAD CONTROLLER RESPONSE:", {
+        console.log("⬆️ Upload flow completed", {
             packageId,
             documentId,
         });
-        res.json({ packageId, documentId });
 
-        console.log("Upload completed:", {
-            packageId,
-            documentId,
-        });
-    } catch (error) {
-        console.error("UPLOAD CONTROLLER ERROR:", error);
+        res.json({ packageId });
+    } catch (err) {
+        console.error("❌ Upload error:", err);
         res.status(500).json({ error: "Upload failed" });
     }
 }
 
 
 /* =========================================================
-   Sign Document
+   IFRAME CONTROLLER
 ========================================================= */
-
-async function signDocument(
-    packageId: number,
-    documentId: number,
-    signerName: string
-): Promise<void> {
-    const fieldName = await createSignatureField(
-        packageId,
-        documentId,
-        signerName
-    );
-    console.log("=== DOCUMENT SIGNING START ===");
-    console.log("Package ID:", packageId);
-    console.log("Document ID:", documentId);
-    console.log("Signature field_name:", fieldName);
-
-    const token = await authenticate();
-    console.log("Authentication successful");
-
-    const url = `${BASE_URL}/v4/packages/${packageId}/documents/${documentId}/sign`;
-    console.log("POST", url);
-
-    const payload = {
-        field_name: fieldName,
-        hand_signature_image: SIGNATURE_BASE64,
-
-    };
-
-    console.log("Signing payload:", payload);
-
-    const res = await axios.post(url, payload, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-        validateStatus: () => true, // 🔥 allow us to inspect status ourselves
-    });
-
-    console.log("Signing HTTP status:", res.status);
-    console.log("Signing raw response:", res.data ?? "<empty>");
-
-    // ✅ Explicit success handling
-    if (res.status === 200 || res.status === 204) {
-        console.log("✅ DOCUMENT SIGNED SUCCESSFULLY");
-        console.log("=== DOCUMENT SIGNING END ===");
-        return;
-    }
-
-    // ❌ Explicit failure
-    console.error("❌ DOCUMENT SIGNING FAILED");
-    throw new Error(
-        `Signing failed with status ${res.status}: ${JSON.stringify(res.data)}`
-    );
-}
-
-
-
-async function createSignatureField(
-    packageId: number,
-    documentId: number,
-    signerName: string
-): Promise<string> {
-
-    console.log("=== CREATE SIGNATURE FIELD START ===");
-
-    const token = await authenticate();
-
-    const fieldName = `${signerName}_signature`;
-
-    const url = `${BASE_URL}/v4/packages/${packageId}/documents/${documentId}/fields/signature`;
-
-    const payload = {
-        field_name: fieldName,
-        order: 1,
-        page_no: 1,
-        display: "VISIBLE",
-        level_of_assurance: ["ELECTRONIC_SIGNATURE"],
-        dimensions: {
-            x: 200,
-            y: 200,
-            width: 150,
-            height: 100,
-        },
-    };
-
-    console.log("Creating signature field:", {
-        url,
-        payload,
-    });
-
-    const res = await axios.post(url, payload, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    });
-
-    console.log("Signature field created successfully:", res.data);
-
-    console.log("=== CREATE SIGNATURE FIELD END ===");
-
-    return fieldName;
-}
-
-
-/* =========================================================
-   SIGN DOCUMENT CONTROLLER
-========================================================= */
-
-export async function signDocumentController(
-    req: Request,
-    res: Response
-) {
+export async function getIframeController(req: Request, res: Response) {
     try {
-        console.log("Sign request received:", req.body);
+        const { packageId } = req.body;
 
-        const { packageId, documentId, signerName } = req.body;
-
-        if (!packageId || !documentId || !signerName) {
-            return res.status(400).json({
-                error: "packageId, documentId and signerName are required",
-            });
+        if (!packageId) {
+            return res.status(400).json({ error: "packageId required" });
         }
 
-        await signDocument(
-            Number(packageId),
-            Number(documentId),
-            signerName
-        );
+        await startWorkflow(Number(packageId));
+        const iframeUrl = await createIframeLink(Number(packageId));
 
-        console.log("✅ BACKEND: Sign flow completed successfully");
+        console.log("🖥️ iframe URL:", iframeUrl);
 
-        res.json({ success: true });
-    } catch (error) {
-        console.error("❌ SIGN DOCUMENT ERROR:", error);
-        res.status(500).json({ error: "Signing failed" });
+        res.json({ iframeUrl });
+    } catch (err) {
+        console.error("❌ iframe error:", err);
+        res.status(500).json({ error: "Failed to create iframe" });
     }
-
-
-
-
 }
 
-
 /* =========================================================
-   DOWNLOAD PACKAGE
+   DOWNLOAD
 ========================================================= */
-
-
-
-/* =========================================================
-   DOWNLOAD PDF CONTROLLER
-========================================================= */
-
-
-
-async function downloadSignedPackageBinary(packageId: number): Promise<Buffer> {
-    console.log("Downloading package from SigningHub:", packageId);
+async function downloadPackageBinary(packageId: number): Promise<Buffer> {
+    console.log(`⬇️ Downloading package ${packageId}`);
 
     const token = await authenticate();
 
@@ -489,42 +235,67 @@ async function downloadSignedPackageBinary(packageId: number): Promise<Buffer> {
                 Authorization: `Bearer ${token}`,
                 Accept: "application/json",
             },
-            responseType: "arraybuffer", // 🔥 REQUIRED
+            responseType: "arraybuffer",
         }
     );
 
-    console.log("SigningHub download response:");
-    console.log("Status:", res.status);
-    console.log("Byte length:", res.data.byteLength);
-
+    console.log("⬇️ Download OK");
     return Buffer.from(res.data);
 }
-
 
 export async function downloadPackageController(req: Request, res: Response) {
     try {
         const packageId = Number(req.params.packageId);
-        const signerName = String(req.query.signerName || "signer");
 
-        console.log("Download request:", { packageId, signerName });
-
-        const pdfBuffer = await downloadSignedPackageBinary(packageId);
-
-        const safeSigner = signerName.replace(/[^a-z0-9_-]/gi, "_");
+        const pdfBuffer = await downloadPackageBinary(packageId);
 
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader(
             "Content-Disposition",
-            `attachment; filename="${safeSigner}-signed-package-${packageId}.pdf"`
+            `attachment; filename="signed-package-${packageId}.pdf"`
         );
-        res.setHeader("Content-Length", pdfBuffer.length);
 
         res.end(pdfBuffer);
     } catch (err) {
-        console.error("DOWNLOAD ERROR:", err);
+        console.error("❌ Download error:", err);
         res.status(500).json({ error: "Download failed" });
     }
 }
 
 
+async function createSignatureField(
+    packageId: number,
+    documentId: number
+) {
+    console.log("✍️ Creating signature field...");
 
+    const token = await authenticate();
+
+    const payload = {
+        field_name: "signature_1",
+        order: 1,
+        page_no: 1,
+        display: "VISIBLE",
+        level_of_assurance: ["ELECTRONIC_SIGNATURE"],
+        dimensions: {
+            x: 40,
+            y: 360,
+            width: 150,
+            height: 60,
+        },
+    };
+
+    const res = await axios.post(
+        `${BASE_URL}/v4/packages/${packageId}/documents/${documentId}/fields/signature`,
+        payload,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    console.log("✍️ Signature field created:", res.data);
+}

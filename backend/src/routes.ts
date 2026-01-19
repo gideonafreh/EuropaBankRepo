@@ -1,25 +1,16 @@
-import {Router} from "express";
+import { Router } from "express";
 import multer from "multer";
 import {
     uploadDocumentController,
-    signDocumentController,
-    downloadPackageController
-    // sendForSigning,
-    // testAuth,
+    getIframeController,
+    downloadPackageController,
 } from "./signinghub";
 
 const router = Router();
-const upload = multer({storage: multer.memoryStorage()});
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/upload", upload.single("file"), uploadDocumentController);
-router.post("/sign", signDocumentController);
-router.get(
-    "/download/:packageId",
-    downloadPackageController
-);
-
-
-// router.post("/sign", sendForSigning);
-// router.get("/auth-test", testAuth);
+router.post("/iframe", getIframeController);
+router.get("/download/:packageId", downloadPackageController);
 
 export default router;
