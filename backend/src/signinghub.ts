@@ -276,7 +276,7 @@ async function createSignatureField(
         order: 1,
         page_no: 1,
         display: "VISIBLE",
-        level_of_assurance: ["ELECTRONIC_SIGNATURE"],
+        level_of_assurance: ["QUALIFIED_ELECTRONIC_SIGNATURE"],
         dimensions: {
             x: 40,
             y: 360,
