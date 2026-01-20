@@ -25,3 +25,7 @@ export async function downloadSignedPackage(packageId: number) {
     });
     return res.data;
 }
+export async function getPackageStatus(packageId: number) {
+    const res = await api.get(`/api/status/${packageId}`);
+    return res.data.status;
+}

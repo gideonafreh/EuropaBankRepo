@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {NameInput} from "../components/NameInput";
 import {FileUpload} from "../components/FileUpload";
 import {getSigningIframe} from "../api/signingHubClient";
@@ -6,9 +6,11 @@ import {uploadFile} from "../api/signingHubClient";
 import {downloadSignedPackage} from "../api/signingHubClient";
 import {SigningIframeModal} from "../components/IframeModal";
 import {LoadingOverlay} from "../components/LoadingOverlay";
+import { getPackageStatus } from "../api/signingHubClient";
 
 import logo from "../assets/pngwing.png";
 import europaBg from "../assets/vecteezy_yellow-blue-black-gradient-background_10547429.jpg";
+import {fireConfetti} from "../Util/Confetti.ts";
 
 export function Home() {
     const [name, setName] = useState("");
@@ -21,6 +23,33 @@ export function Home() {
 
     // ✅ THIS STATE IS NOW ACTUALLY USED
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+    useEffect(() => {
+        if (signed) {
+            fireConfetti();
+        }
+    }, [signed]);
+
+
+    function startSigningStatusPolling(packageId: number) {
+        const interval = setInterval(async () => {
+            try {
+                const status = await getPackageStatus(Number(packageId));
+
+                console.log("📦 Signing status:", status);
+
+                if (status === "COMPLETED") {
+                    clearInterval(interval);
+
+                    setIframeUrl(null);
+                    setSigned(true);
+                    fireConfetti();
+                }
+            } catch (err) {
+                console.error("Status polling error:", err);
+            }
+        }, 3000); // every 3 seconds
+    }
+
 
     /* ===============================
        SIGNING IFRAME
@@ -31,7 +60,9 @@ export function Home() {
         setLoading(true);
         try {
             const url = await getSigningIframe(packageId);
-            setIframeUrl(url); // ✅ used in JSX below
+            setIframeUrl(url);
+            startSigningStatusPolling(Number(packageId));
+
         } finally {
             setLoading(false);
         }
@@ -90,8 +121,9 @@ export function Home() {
                 <SigningIframeModal
                     iframeUrl={iframeUrl}
                     onClose={() => {
-                        setSigned(true);
                         setIframeUrl(null);
+                        // setSigned(true);
+                        // fireConfetti();
                     }}
                 />
             )}

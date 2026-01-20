@@ -276,7 +276,7 @@ async function createSignatureField(
         order: 1,
         page_no: 1,
         display: "VISIBLE",
-        level_of_assurance: ["QUALIFIED_ELECTRONIC_SIGNATURE"],
+        level_of_assurance: ["ELECTRONIC_SIGNATURE"],
         dimensions: {
             x: 40,
             y: 360,
@@ -299,3 +299,54 @@ async function createSignatureField(
 
     console.log("✍️ Signature field created:", res.data);
 }
+
+async function getPackageStatus(packageId: number): Promise<string> {
+    console.log(`🔍 Checking workflow status for package ${packageId}`);
+
+    const token = await authenticate();
+
+    const res = await axios.get(
+        `${BASE_URL}/v4/packages/${packageId}/workflow`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+            },
+        }
+    );
+
+    console.log("📦 Workflow response:", res.data);
+
+    // ✅ SigningHub structure
+    const status =
+        res.data?.workflow?.workflow_status ??
+        res.data?.package_status ??
+        "UNKNOWN";
+
+    console.log(`📦 Package ${packageId} workflow status:`, status);
+
+    return status;
+}
+
+
+
+
+
+
+export async function getPackageStatusController(req: Request, res: Response) {
+    try {
+        const packageId = Number(req.params.packageId);
+
+        if (!packageId) {
+            return res.status(400).json({ error: "packageId required" });
+        }
+
+        const status = await getPackageStatus(packageId);
+
+        res.json({ status });
+    } catch (err) {
+        console.error("❌ Status check error:", err);
+        res.status(500).json({ error: "Failed to check package status" });
+    }
+}
+
