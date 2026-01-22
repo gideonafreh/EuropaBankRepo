@@ -1,3 +1,4 @@
+import ebLogo from "../assets/pngwing.png";
 type Props = {
     iframeUrl: string;
     onClose: () => void;
@@ -31,24 +32,38 @@ export function SigningIframeModal({ iframeUrl, onClose }: Props) {
                         className="modal-header"
                         style={{
                             background: "linear-gradient(135deg, #0d6efd, #084298)",
-                            color: "#fff",
                             padding: "1rem 1.5rem",
                             borderBottom: "none",
+                            position: "relative",
+                            minHeight: "80px",
                         }}
                     >
-                        <div>
-                            <h5 className="modal-title mb-0 fw-semibold">
-                                Sign Document
-                            </h5>
-                            <small style={{ opacity: 0.85 }}>
-                                Please review and complete the signing process
-                            </small>
+                        {/* Centered EB logo */}
+                        <div
+                            style={{
+                                position: "absolute",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                display: "flex",
+                                alignItems: "center",
+                            }}
+                        >
+                            <img
+                                src={ebLogo}
+                                alt="Europabank"
+                                style={{
+                                    height: "80px",
+                                    objectFit: "contain",
+                                }}
+                            />
                         </div>
 
+                        {/* Close button */}
                         <button
                             onClick={onClose}
                             aria-label="Close"
                             style={{
+                                marginLeft: "auto",
                                 background: "rgba(255,255,255,0.2)",
                                 border: "none",
                                 borderRadius: "50%",
