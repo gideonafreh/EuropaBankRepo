@@ -116,7 +116,7 @@ export function Home() {
         <>
             <LoadingOverlay visible={loading} message="Processing document…"/>
 
-            {/* ✅ IFRAME MODAL — THIS FIXES YOUR ERROR */}
+            {/*  IFRAME MODAL — THIS FIXES YOUR ERROR */}
             {iframeUrl && (
                 <SigningIframeModal
                     iframeUrl={iframeUrl}
